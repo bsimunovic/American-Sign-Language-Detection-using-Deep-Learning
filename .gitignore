@@ -1,0 +1,16 @@
+# Dataset and trained weights (download / generate locally)
+ASL_Dataset/
+TrainedModels/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Office lock files
+~$*

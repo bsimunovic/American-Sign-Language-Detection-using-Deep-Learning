@@ -1,0 +1,7 @@
+# Build context is the repository root; only send what the images need.
+*
+!pyproject.toml
+!uv.lock
+!asl/
+!artifacts/model/
+asl/**/__pycache__

@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: asl
+labels:
+  - pairs:
+      app.kubernetes.io/name: asl-api
+      app.kubernetes.io/part-of: asl
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - ingress.yaml
+images:
+  - name: asl-api
+    newName: asl-api
+    newTag: latest

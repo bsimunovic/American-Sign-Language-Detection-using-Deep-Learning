@@ -1,0 +1,8 @@
+# Tiny, fast run to check the pipeline end to end on real data.
+#   asl-lab run -c params.yaml -c asl/lab/configs/smoke.yaml
+split:
+  max_per_class: 20
+train:
+  epochs: 2
+evaluate:
+  latency_runs: 5

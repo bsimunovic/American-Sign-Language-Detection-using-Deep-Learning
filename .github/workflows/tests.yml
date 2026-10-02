@@ -5,14 +5,59 @@ on:
   pull_request:
 
 jobs:
-  pytest:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements-dev.txt
-      - run: pip install -r requirements-dev.txt
-      - run: pytest -q
+          version: "0.8.17"
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked --all-extras
+      - name: Lint
+        run: uv run ruff check asl tests
+      - name: Test
+        run: uv run pytest -q
+      - name: Validate pipeline and configs
+        run: |
+          uv run dvc dag
+          for preset in asl/lab/configs/*.yaml; do uv run asl-lab show-config -c params.yaml -c "$preset" > /dev/null; done
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.17"
+          enable-cache: true
+      - run: uv sync --locked --extra lab
+      # A real image ships a trained bundle (dvc pull); CI packages an untrained one
+      # only to check that the image builds, starts and serves.
+      - name: Create a placeholder model bundle
+        run: |
+          uv run python - <<'PY'
+          from asl.lab.models import build_model
+          from asl.prod.bundle import BundleMetadata, save_bundle
+          from asl.prod.constants import DEFAULT_CLASSES
+          from asl.prod.preprocessing import PreprocessConfig
+
+          preprocess = PreprocessConfig(img_size=64, draw_landmarks=True, hand_crop=True)
+          model = build_model("cnn", {}, preprocess.input_shape, len(DEFAULT_CLASSES))
+          metadata = BundleMetadata(name="ci-placeholder", classes=DEFAULT_CLASSES, preprocess=preprocess)
+          save_bundle(model, metadata, "artifacts/model")
+          PY
+      - name: Build API image
+        run: docker build -f docker/api.Dockerfile -t asl-api:ci .
+      - name: Smoke test API image
+        run: |
+          docker run -d --name api --read-only --tmpfs /tmp -e HOME=/tmp -e KERAS_HOME=/tmp/.keras \
+            -e MPLCONFIGDIR=/tmp/.matplotlib -p 8000:8000 asl-api:ci
+          for i in $(seq 1 60); do curl -sf localhost:8000/ready && break; sleep 2; done
+          curl -sf localhost:8000/v1/model
+      - name: API logs
+        if: always()
+        run: docker logs api || true
+      - name: Build lab image
+        run: docker build -f docker/lab.Dockerfile -t asl-lab:ci .

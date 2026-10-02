@@ -1,0 +1,76 @@
+# Experiment pipeline. Every stage is `asl-lab <stage>` reading params.yaml.
+#   uv run dvc repro                                     # run what changed
+#   uv run dvc exp run -S model.name=legacy_cnn          # one experiment
+#   uv run dvc exp run --queue -S 'train.batch_size=32,64' -S 'model.cnn.dropout=0.1,0.25'
+#   uv run dvc queue start -j 1 && uv run dvc exp show   # run the grid and compare
+# Stages only rerun when their own params/deps change: tuning `train.*` reuses
+# the cached split and features, so hand detection runs once per preprocessing setup.
+# ${paths.*} come from params.yaml, which DVC loads for templating automatically.
+stages:
+  split:
+    cmd: asl-lab split
+    deps:
+      - data/raw
+      - asl/lab/data.py
+    params:
+      - data
+      - split
+    outs:
+      - ${paths.splits_dir}
+
+  featurize:
+    cmd: asl-lab featurize
+    deps:
+      - data/raw
+      - ${paths.splits_dir}
+      - asl/lab/features.py
+      - asl/prod/preprocessing.py
+      - asl/prod/hands.py
+    params:
+      - features.preprocess
+    outs:
+      - ${paths.features_dir}
+
+  train:
+    cmd: asl-lab train
+    deps:
+      - ${paths.features_dir}
+      - asl/lab/train.py
+      - asl/lab/models.py
+      - asl/lab/augment.py
+      - asl/prod/bundle.py
+    params:
+      - name
+      - model
+      - train
+      - evaluate.top_k
+    outs:
+      - ${paths.model_dir}
+    metrics:
+      - ${paths.train_dir}/metrics.json:
+          cache: false
+    plots:
+      - ${paths.train_dir}/live/plots/metrics:
+          x: step
+          cache: false
+
+  evaluate:
+    cmd: asl-lab evaluate
+    deps:
+      - ${paths.model_dir}
+      - ${paths.features_dir}
+      - asl/lab/evaluate.py
+    params:
+      - evaluate
+    metrics:
+      - ${paths.eval_dir}/metrics.json:
+          cache: false
+    outs:
+      - ${paths.eval_dir}/per_class.json:
+          cache: false
+    plots:
+      - ${paths.eval_dir}/confusion.csv:
+          template: confusion
+          x: actual
+          y: predicted
+          cache: false

@@ -1,4 +1,10 @@
-# Dataset and trained weights (download / generate locally)
+# Data and pipeline outputs are versioned by DVC, which adds its own .gitignore
+# entries next to them (e.g. data/.gitignore after `dvc add data/raw`).
+
+# Interactive runs from notebooks/02_experiments.ipynb
+scratch/
+
+# Legacy layout
 ASL_Dataset/
 TrainedModels/
 
@@ -6,6 +12,7 @@ TrainedModels/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
 .venv/
 venv/
 

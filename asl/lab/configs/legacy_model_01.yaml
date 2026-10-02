@@ -1,0 +1,22 @@
+# Reproduce the original project's best setup (model_01, landmarks drawn, full frame).
+#   asl-lab run -c params.yaml -c asl/lab/configs/legacy_model_01.yaml
+features:
+  preprocess:
+    img_size: 64
+    draw_landmarks: true
+    hand_crop: false
+    interpolation: nearest
+model:
+  name: legacy_cnn
+  legacy_cnn:
+    variant: model_01
+train:
+  batch_size: 64
+  lr_schedule: plateau
+  augment:
+    rotation: 0.11
+    translation: 0.2
+    zoom: 0.2
+    contrast: 0.0
+    brightness: 0.0
+    horizontal_flip: true

@@ -1,0 +1,18 @@
+# Landmark representation: MediaPipe's 21 hand keypoints -> small MLP.
+# Background- and lighting-invariant; ~55k parameters and ~1 ms per frame on CPU.
+#   asl-lab run -c params.yaml -c asl/lab/configs/landmarks_mlp.yaml
+features:
+  preprocess:
+    representation: landmarks
+    draw_landmarks: false
+    hand_crop: false
+model:
+  name: mlp
+  mlp:
+    hidden: [256, 128]
+    batch_norm: true
+    dropout: 0.3
+train:
+  epochs: 100
+  batch_size: 128
+  early_stopping_patience: 10

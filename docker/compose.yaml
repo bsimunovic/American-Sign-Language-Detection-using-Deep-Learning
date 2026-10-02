@@ -1,0 +1,36 @@
+# Local stack. From the repository root:
+#   docker compose -f docker/compose.yaml up --build api            # serve artifacts/model on :8000
+#   docker compose -f docker/compose.yaml run --rm lab dvc repro     # run the pipeline in a container
+#   docker compose -f docker/compose.yaml --profile lab up jupyter   # notebooks on :8888
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    image: asl-api:local
+    ports:
+      - "8000:8000"
+    environment:
+      ASL_SMOOTHING_WINDOW: "5"
+      ASL_MIN_CONFIDENCE: "0.3"
+
+  lab:
+    profiles: ["lab"]
+    build:
+      context: ..
+      dockerfile: docker/lab.Dockerfile
+    image: asl-lab:local
+    volumes:
+      - ..:/workspace
+
+  jupyter:
+    profiles: ["lab"]
+    image: asl-lab:local
+    build:
+      context: ..
+      dockerfile: docker/lab.Dockerfile
+    volumes:
+      - ..:/workspace
+    ports:
+      - "8888:8888"
+    command: ["jupyter", "lab", "--ip=0.0.0.0", "--allow-root", "--no-browser", "--notebook-dir=/workspace/notebooks"]

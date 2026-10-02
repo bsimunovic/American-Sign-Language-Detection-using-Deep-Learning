@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: asl-api
+spec:
+  selector:
+    app.kubernetes.io/name: asl-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

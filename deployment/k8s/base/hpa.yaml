@@ -1,0 +1,23 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: asl-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: asl-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    # Inference is CPU bound, so CPU utilisation tracks load well.
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      # Scale down slowly: removing a pod drops its open live sessions.
+      stabilizationWindowSeconds: 300

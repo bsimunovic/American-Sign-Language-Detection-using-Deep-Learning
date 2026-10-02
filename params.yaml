@@ -1,0 +1,94 @@
+# Experiment configuration (DVC parameters). Every key is validated by
+# asl/lab/config.py. Change values here, or per experiment with
+#   dvc exp run -S train.optimizer.learning_rate=3e-4 -S 'model.cnn.filters=[32,64,128,256]'
+name: asl
+
+paths:
+  splits_dir: data/splits
+  features_dir: data/features
+  model_dir: artifacts/model
+  train_dir: artifacts/train
+  eval_dir: artifacts/eval
+
+data:
+  train_dir: data/raw/Train
+  test_dir: data/raw/Test       # null: carve split.test_fraction out of train_dir
+  classes: null                 # null: every class folder, in alphabetical order
+
+split:
+  strategy: stratified          # stratified | group (no recording/signer shared across splits)
+  val_fraction: 0.2
+  test_fraction: 0.1            # only used when data.test_dir is null
+  group_pattern: null           # regex on file name, 1st group = group id, e.g. '^(\w+?)_\d+'
+  max_per_class: null           # e.g. 200 for a quick smoke experiment
+  seed: 42
+
+features:
+  workers: 4                    # processes for MediaPipe hand detection
+  preprocess:                   # stored in the model bundle and reused by the API
+    representation: image       # image | landmarks
+    img_size: 64
+    flip_horizontal: false
+    blur: 0
+    draw_landmarks: true        # draw the hand skeleton (as the original project did)
+    hand_crop: true             # crop around the hand: removes background, normalises scale
+    crop_margin: 0.25
+    require_hand: false
+    interpolation: area
+    canonical_hand: true
+    min_detection_confidence: 0.5
+    min_tracking_confidence: 0.5
+
+model:
+  name: cnn                     # which section below to train
+  # One params section per architecture; only the selected one is used.
+  cnn:                          # image: configurable VGG-style CNN
+    filters: [32, 64, 128]      # one conv block per entry
+    convs_per_block: 2
+    kernel_size: 3
+    batch_norm: true
+    dropout: 0.25
+    pooling: global_avg         # global_avg | flatten
+    dense_units: [256]
+    dense_dropout: 0.5
+  legacy_cnn:                   # image: the original project's architectures
+    variant: model_01           # model_01 ... model_07
+  mobilenet_v3:                 # image: ImageNet transfer learning
+    size: small                 # small | large
+    alpha: 1.0
+    pretrained: true
+    trainable_layers: 0         # 0 frozen backbone, N fine-tune top N layers, -1 all
+    dropout: 0.2
+  mlp:                          # landmarks: MLP over 21 normalised hand keypoints
+    hidden: [256, 128]
+    batch_norm: true
+    dropout: 0.3
+
+train:
+  epochs: 30
+  batch_size: 32
+  optimizer:
+    name: adam                  # adam | adamw | sgd
+    learning_rate: 0.001
+    weight_decay: 0.0
+    momentum: 0.9
+  lr_schedule: plateau          # constant | plateau | cosine
+  label_smoothing: 0.0
+  class_weight: none            # none | balanced
+  early_stopping_patience: 5
+  monitor: val_accuracy
+  augment:
+    rotation: 0.05
+    translation: 0.1
+    zoom: 0.1
+    contrast: 0.1
+    brightness: 0.1
+    horizontal_flip: false
+    landmark_noise: 0.01
+    landmark_scale: 0.1
+    landmark_rotation_deg: 10.0
+  seed: 42
+
+evaluate:
+  top_k: 3
+  latency_runs: 50

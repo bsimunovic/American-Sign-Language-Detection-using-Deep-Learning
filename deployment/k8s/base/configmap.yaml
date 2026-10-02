@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asl-api
+data:
+  # Read by asl/prod/api/settings.py (ASL_* environment variables).
+  ASL_MODEL_DIR: /app/model
+  ASL_TOP_K: "3"
+  ASL_MIN_CONFIDENCE: "0.3"
+  ASL_SMOOTHING_WINDOW: "5"
+  ASL_MAX_IMAGE_BYTES: "5242880"
+  ASL_ENABLE_DEMO: "true"
+  ASL_LOG_LEVEL: info

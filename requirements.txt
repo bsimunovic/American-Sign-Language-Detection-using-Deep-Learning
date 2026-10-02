@@ -1,8 +1,0 @@
-tensorflow>=2.12
-numpy
-scipy
-scikit-learn
-pillow
-opencv-python
-# mp.solutions (legacy Hands API) was removed in newer mediapipe releases.
-mediapipe>=0.10,<0.10.15

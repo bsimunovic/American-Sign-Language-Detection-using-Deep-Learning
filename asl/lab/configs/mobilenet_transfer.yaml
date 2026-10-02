@@ -1,0 +1,20 @@
+# Transfer learning from ImageNet with a frozen MobileNetV3-Small backbone.
+#   asl-lab run -c params.yaml -c asl/lab/configs/mobilenet_transfer.yaml
+features:
+  preprocess:
+    img_size: 128
+model:
+  name: mobilenet_v3
+  mobilenet_v3:
+    size: small
+    pretrained: true
+    trainable_layers: 0
+    dropout: 0.2
+train:
+  batch_size: 64
+  optimizer:
+    name: adamw
+    learning_rate: 0.0005
+    weight_decay: 0.0001
+  lr_schedule: cosine
+  label_smoothing: 0.1

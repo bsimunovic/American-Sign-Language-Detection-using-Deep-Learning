@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASL live demo</title>
+<style>
+  :root { --bg: #f6f7f9; --fg: #1d2330; --muted: #5b6475; --accent: #1f7a5a; --card: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #14171c; --fg: #e7e9ee; --muted: #9aa3b2; --accent: #4fd1a1; --card: #1d2128; } }
+  body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .stage { position: relative; background: #000; border-radius: 8px; overflow: hidden; }
+  video, canvas { width: 100%; display: block; transform: scaleX(-1); }
+  canvas { position: absolute; inset: 0; }
+  .result { display: flex; align-items: baseline; gap: 16px; margin: 16px 0; padding: 16px; background: var(--card); border-radius: 8px; }
+  .label { font-size: 64px; font-weight: 700; color: var(--accent); min-width: 1ch; }
+  .meta { color: var(--muted); font-size: 14px; line-height: 1.6; }
+  button { font: inherit; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--muted); background: var(--card); color: var(--fg); cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ASL live recognition</h1>
+  <div class="stage"><video id="video" autoplay playsinline muted></video><canvas id="overlay"></canvas></div>
+  <div class="result">
+    <div class="label" id="label">–</div>
+    <div class="meta" id="meta">Press start and show a sign to the camera.</div>
+  </div>
+  <button id="toggle">Start</button>
+</main>
+<script>
+const CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
+const video = document.getElementById("video"), overlay = document.getElementById("overlay");
+const labelEl = document.getElementById("label"), metaEl = document.getElementById("meta");
+const toggle = document.getElementById("toggle");
+const grab = document.createElement("canvas");
+let ws = null, running = false;
+
+function draw(hand) {
+  overlay.width = video.videoWidth; overlay.height = video.videoHeight;
+  const ctx = overlay.getContext("2d");
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  if (!hand) return;
+  const pts = hand.landmarks.map(([x, y]) => [x * overlay.width, y * overlay.height]);
+  ctx.strokeStyle = "#4fd1a1"; ctx.lineWidth = 3;
+  for (const [a, b] of CONNECTIONS) { ctx.beginPath(); ctx.moveTo(...pts[a]); ctx.lineTo(...pts[b]); ctx.stroke(); }
+  ctx.fillStyle = "#ffffff";
+  for (const [x, y] of pts) { ctx.beginPath(); ctx.arc(x, y, 4, 0, 2 * Math.PI); ctx.fill(); }
+}
+
+function sendFrame() {
+  if (!running || ws.readyState !== WebSocket.OPEN) return;
+  grab.width = video.videoWidth; grab.height = video.videoHeight;
+  grab.getContext("2d").drawImage(video, 0, 0);
+  grab.toBlob(blob => blob && ws.send(blob), "image/jpeg", 0.8);
+}
+
+async function start() {
+  video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+  await video.play();
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/v1/live`);
+  ws.binaryType = "arraybuffer";
+  ws.onopen = () => { running = true; sendFrame(); };
+  ws.onmessage = event => {
+    const msg = JSON.parse(event.data);
+    if (msg.error) { metaEl.textContent = msg.error; }
+    else if (msg.smoothed) {
+      const s = msg.smoothed;
+      labelEl.textContent = s.label ?? "–";
+      metaEl.innerHTML = s.hand_detected
+        ? `confidence ${(s.confidence * 100).toFixed(0)}% · top: ${s.top_k.map(t => `${t.label} ${(t.probability * 100).toFixed(0)}%`).join(", ")}<br>${msg.latency_ms} ms/frame`
+        : `no hand detected · ${msg.latency_ms} ms/frame`;
+      draw(msg.prediction.hand);
+    }
+    sendFrame();  // one frame in flight at a time keeps latency low
+  };
+  ws.onclose = event => { running = false; if (event.reason) metaEl.textContent = event.reason; };
+}
+
+function stop() {
+  running = false;
+  if (ws) ws.close();
+  if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+}
+
+toggle.onclick = async () => {
+  if (running) { stop(); toggle.textContent = "Start"; return; }
+  try { await start(); toggle.textContent = "Stop"; } catch (err) { metaEl.textContent = err.message; }
+};
+</script>
+</body>
+</html>
